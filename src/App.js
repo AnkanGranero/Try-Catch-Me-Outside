@@ -1,88 +1,138 @@
-import React, { Component } from 'react';
-import './App.css';
-import { Map, InfoWindow, Marker, GoogleApiWrapper, Circle } from 'google-maps-react';
-import fire from './firebase.js'
+import React, { Component } from "react";
+import "./App.css";
+import GoogleMaps from "./GoogleMaps.js";
+import fire from "./firebase.js";
+import Music from "./music";
+import Video from "./video";
+import Info from "./infoModal";
+const arrOfPlayers = [
+  {
+    name: "Police",
+    img: "policeBlue.png"
+  },
+  {
+    name: "PurpleThief",
+    img: "thiefPurple.png"
+  },
+  {
+    name: "RedThief",
+    img: "thiefRed.png"
+  },
+  {
+    name: "YellowThief",
+    img: "thiefYellow.png"
+  }
+];
 
+export default class App extends Component {
+  constructor() {
+    super();
+    this.state = {
+      clicked: false,
+      playerName: "",
+      loggedIn: false,
+      lastActivity: 0,
+      Police: { loggedIn: false },
+      PurpleThief: { loggedIn: false },
+      RedThief: { loggedIn: false },
+      YellowThief: { loggedIn: false },
+      infoModal: true
+    };
+  }
 
-class App extends Component {
-  state = { userLocation: { lat: 32, lng: 32 }, secondUserLocation: { lat: 32, lng: 32 }, loading: true };
-
-
-  constructor(props) {
-    super(props);
-
+  onClickButton(name) {
+    this.setState({
+      clicked: true,
+      playerName: name,
+      loggedIn: true
+    });
+  }
+  closeInfoModal() {
+    this.setState({
+      infoModal: false
+    });
+  }
+  componentDidMount() {
     const db = fire.database();
-    const secondPlayer = db.ref().child('test')
-    secondPlayer
-      .once("value")
-      .then(snapshot => snapshot.val())
-      .then(secondPlayer => this.setState({ secondUserLocation: { lat: secondPlayer.location.lat, lng: secondPlayer.location.lng } }))
+
+    setInterval(() => {
+      arrOfPlayers.forEach(player =>
+        db
+          .ref()
+          .child(player.name)
+          .once("value")
+          .then(snapshot => snapshot.val())
+          .then(resultDB => {
+            this.setState({
+              [player.name]: {
+                loggedIn: resultDB.loggedIn
+              }
+            });
+          })
+      );
+    }, 2000);
   }
 
-  componentDidMount(props) {
-
-
-
-    const firebaseRef = fire.database().ref('Jesper')
-
-
-    navigator.geolocation.watchPosition(
-      position => {
-        const { latitude, longitude } = position.coords;
-
-        this.setState({
-          userLocation: { lat: latitude, lng: longitude },
-          loading: false
-        });
-
-        // Skickar location till firebase
-        const item = {
-          location: this.state.userLocation
-        }
-        
-        firebaseRef.update(item);
-
-      },
-      () => {
-        this.setState({ loading: false });
-      }
-    );
-
+  logOut() {
+    this.setState({
+      loggedIn: false
+    });
   }
-
-
 
   render() {
-    console.log(this.state.userLocation)
-    const { loading, userLocation, secondUserLocation } = this.state;
-    const { google } = this.props;
+    const buttons = arrOfPlayers.map((playerInArr, i) => {
+      if (!this.state[playerInArr.name].loggedIn) {
+        return (
+          <button
+            className="button-wrapper"
+            onClick={this.onClickButton.bind(this, playerInArr.name)}
+          >
+            <img src={playerInArr.img} className="del" />
+            <span className="astext">{playerInArr.name}</span>
+          </button>
+        );
+      } else {
+        return (
+          <button className="taken-character">
+            <img src={playerInArr.img} className="del" />
+            <span className="takenCharText">
+              {playerInArr.name} is Taken
+            </span>{" "}
+          </button>
+        );
+      }
+    });
 
-    if (loading) {
-      return null;
-    }
-
-    return <Map google={google} initialCenter={userLocation} center={secondUserLocation} zoom={15}>
-      <Circle
-        radius={100}
-        center={userLocation}
-        onClick={() => console.log("klickade på cirkeln")}
-        strokeColor="transparent"
-        strokeOpactiy={0}
-        strokeWeight={5}
-        fillColor="#FF0000"
-        fillOpacity={0.2}
-
-      />
-      <Marker
-        position={userLocation}
-        icon="https://www.robotwoods.com/dev/misc/bluecircle.png"
-      />
-      <Marker
-        position={secondUserLocation} />
-    </Map>
+    return (
+      <div>
+        <Video />
+        {/* lägg till att det ska vara sant att den är klickad och spelaren inte är upptagen */}
+        {this.state.infoModal ? (
+          <div>
+            <div className="headerWrapper">
+              <h1>TRY CATCH ME OUTSIDE</h1>
+            </div>
+            <Info closeInfoModal={this.closeInfoModal.bind(this)} />
+            <Music />
+          </div>
+        ) : this.state.clicked && this.state.loggedIn ? (
+          <div>
+            <GoogleMaps
+              playerName={this.state.playerName}
+              logOut={this.logOut.bind(this)}
+              arrOfPlayers={arrOfPlayers}
+            />
+          </div>
+        ) : (
+          <div>
+            <div className="headerWrapper">
+              <h1>TRY CATCH ME OUTSIDE</h1>
+            </div>
+            <div className="buttonWrapper"> {buttons}</div>
+            <Music />
+          </div>
+        )}
+      </div>
+    );
   }
 }
-
-export default GoogleApiWrapper({
-  apiKey: ("AIzaSyBIvD8kOI5sxcZPcNQDtRplslCRcf2Jm_8")
-})(App)
